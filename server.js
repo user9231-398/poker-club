@@ -168,6 +168,22 @@ io.on('connection', (socket) => {
     if (dealerName !== undefined) table.dealerName = dealerName;
     broadcast();
   });
+
+  // Display: reorder tables (drag and drop)
+  socket.on('reorderTables', (orderedIds) => {
+    if (!Array.isArray(orderedIds)) return;
+    const reordered = [];
+    for (const id of orderedIds) {
+      const t = state.tables.find(t => t.id === id);
+      if (t) reordered.push(t);
+    }
+    // append any tables not in the list (safety)
+    for (const t of state.tables) {
+      if (!reordered.includes(t)) reordered.push(t);
+    }
+    state.tables = reordered;
+    broadcast();
+  });
 });
 
 // ── Start ────────────────────────────────────────────────────────────

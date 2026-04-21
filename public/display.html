@@ -7,6 +7,77 @@
   <link rel="stylesheet" href="style.css">
   <style>
     body { overflow-x: hidden; }
+
+    /* ── Drag and drop ─────────────────────────────────────────── */
+    .table-card {
+      cursor: grab;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      border: 2px solid transparent;
+      border-radius: 14px;
+    }
+    .table-card:hover {
+      border-color: var(--border);
+    }
+    .table-card.dragging {
+      opacity: 0.4;
+      transform: scale(0.95);
+    }
+    .table-card.drag-over {
+      border-color: var(--gold);
+      box-shadow: 0 0 20px rgba(240, 180, 48, 0.2);
+      transform: scale(1.02);
+    }
+    .drag-hint {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 0.75rem;
+      opacity: 0.6;
+    }
+
+    /* ── Credits display on seats ──────────────────────────────── */
+    .seat-credits {
+      font-size: 0.6rem;
+      font-weight: 800;
+      color: var(--gold);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      margin-top: 1px;
+    }
+
+    .seat-credits.zero { color: var(--text-dim); }
+
+    /* ── Leaderboard wealth ────────────────────────────────────── */
+    .leaderboard-row {
+      grid-template-columns: 36px 1fr auto;
+    }
+
+    .wealth-display {
+      text-align: right;
+    }
+
+    .wealth-amount {
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--gold);
+    }
+
+    .wealth-ko {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Table total ───────────────────────────────────────────── */
+    .table-total {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 0.5rem;
+    }
+
+    .table-total span {
+      color: var(--gold);
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -29,6 +100,7 @@
           </div>
           <div class="panel-body">
             <div id="tablesArea" class="tables-grid"></div>
+            <div class="drag-hint" id="dragHint" style="display:none;">Drag tables to reorder</div>
           </div>
         </div>
       </div>
@@ -37,7 +109,7 @@
       <div>
         <div class="panel">
           <div class="panel-header">
-            Leaderboard
+            Richest Players
             <span id="playerCount" style="color:var(--text-dim);font-weight:500;font-size:0.8rem;"></span>
           </div>
           <div class="panel-body" style="padding:0.5rem 0;">
@@ -51,27 +123,25 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentTables = [];
 
-    // Seat positions (percentages) for different table sizes
+    // ── Seat positions around the oval ─────────────────────────────
     function seatPositions(count) {
-      // Return positions as [top%, left%] around the oval
       const positions = [];
       for (let i = 0; i < count; i++) {
         const angle = (2 * Math.PI * i / count) - Math.PI / 2;
-        const rx = 58; // x radius %
-        const ry = 58; // y radius %
-        const cx = 50;
-        const cy = 50;
         positions.push([
-          cy + ry * Math.sin(angle),
-          cx + rx * Math.cos(angle)
+          50 + 58 * Math.sin(angle),
+          50 + 58 * Math.cos(angle)
         ]);
       }
       return positions;
     }
 
+    // ── Render a single table ──────────────────────────────────────
     function renderTable(table) {
       const positions = seatPositions(table.seats.length);
+
       const seatsHTML = table.seats.map((seat, i) => {
         const [top, left] = positions[i];
         const occupied = seat.playerName ? 'occupied' : '';
@@ -79,26 +149,47 @@
         const initials = seat.playerName
           ? seat.playerName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
           : seat.position;
+        const creditsClass = (seat.score || 0) === 0 ? 'zero' : '';
+
         return `
           <div class="seat ${occupied} ${eliminated}" style="top:${top}%;left:${left}%;">
             <div class="seat-circle">${initials}</div>
             <div class="seat-name">${seat.playerName || 'Empty'}</div>
-            ${seat.playerName ? `<div class="seat-score">${seat.score || 0}</div>` : ''}
+            ${seat.playerName ? `<div class="seat-credits ${creditsClass}">${formatCredits(seat.score || 0)}</div>` : ''}
           </div>
         `;
       }).join('');
 
+      // Table total credits
+      const totalCredits = table.seats.reduce((sum, s) => sum + (s.playerName ? (s.score || 0) : 0), 0);
+      const playerCount = table.seats.filter(s => s.playerName).length;
+
       return `
-        <div class="table-visual animate-in">
-          <div class="table-label"><span>${table.name}</span>${table.dealerName ? ' &mdash; ' + table.dealerName : ''}</div>
-          <div class="felt">
-            <div class="dealer-tag">DEALER${table.dealerName ? '<span class="name">' + table.dealerName + '</span>' : ''}</div>
-            ${seatsHTML}
+        <div class="table-card" draggable="true" data-table-id="${table.id}">
+          <div class="table-visual">
+            <div class="table-label">
+              <span>${table.name}</span>${table.dealerName ? ' &mdash; ' + table.dealerName : ''}
+            </div>
+            <div class="felt">
+              <div class="dealer-tag">
+                ${playerCount} player${playerCount !== 1 ? 's' : ''}
+                <span class="name">${formatCredits(totalCredits)} total</span>
+              </div>
+              ${seatsHTML}
+            </div>
+            <div class="table-total">${playerCount} players &middot; <span>${formatCredits(totalCredits)}</span> on table</div>
           </div>
         </div>
       `;
     }
 
+    function formatCredits(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 10000) return (n / 1000).toFixed(1) + 'K';
+      return n.toLocaleString();
+    }
+
+    // ── Render leaderboard (richest players) ───────────────────────
     function renderLeaderboard(players) {
       if (!players.length) {
         return '<div class="empty-state"><div class="icon">&spades;</div><p>No players yet</p></div>';
@@ -115,29 +206,139 @@
           <div class="leaderboard-row ${p.eliminated ? 'eliminated' : ''} animate-in" style="animation-delay:${i * 0.03}s">
             <div class="rank ${rankClass}">${rank}</div>
             <div class="player-name">${p.name}</div>
-            <div class="player-score">${p.totalScore}</div>
-            <div class="player-knockouts">${p.knockouts ? p.knockouts + ' KO' : ''}</div>
+            <div class="wealth-display">
+              <div class="wealth-amount">${formatCredits(p.totalScore)}</div>
+              ${p.knockouts ? `<div class="wealth-ko">${p.knockouts} KO</div>` : ''}
+            </div>
           </div>
         `;
       }).join('');
     }
 
+    // ── State updates ──────────────────────────────────────────────
     socket.on('state', (data) => {
+      currentTables = data.tables;
+
       document.getElementById('sessionName').textContent = data.sessionName;
       document.title = data.sessionName + ' - Display';
 
       // Tables
       const tablesArea = document.getElementById('tablesArea');
       if (data.tables.length === 0) {
-        tablesArea.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables set up yet.<br>Use the Admin panel to add tables.</p></div>';
+        tablesArea.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables set up yet.<br>Open the Dealer panel to add tables.</p></div>';
+        document.getElementById('dragHint').style.display = 'none';
       } else {
         tablesArea.innerHTML = data.tables.map(renderTable).join('');
+        document.getElementById('dragHint').style.display = data.tables.length > 1 ? 'block' : 'none';
+        initDragAndDrop();
       }
       document.getElementById('tableCount').textContent = data.tables.length + ' table' + (data.tables.length !== 1 ? 's' : '');
 
       // Leaderboard
       document.getElementById('leaderboard').innerHTML = renderLeaderboard(data.leaderboard);
-      document.getElementById('playerCount').textContent = data.leaderboard.length + ' player' + (data.leaderboard.length !== 1 ? 's' : '');
+      const totalWealth = data.leaderboard.reduce((s, p) => s + p.totalScore, 0);
+      document.getElementById('playerCount').textContent = data.leaderboard.length + ' player' + (data.leaderboard.length !== 1 ? 's' : '') +
+        (totalWealth ? ' \u00b7 ' + formatCredits(totalWealth) + ' total' : '');
+    });
+
+    // ── Drag and drop ──────────────────────────────────────────────
+    let draggedId = null;
+
+    function initDragAndDrop() {
+      const cards = document.querySelectorAll('.table-card');
+
+      cards.forEach(card => {
+        card.addEventListener('dragstart', (e) => {
+          draggedId = card.dataset.tableId;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          // Need a small delay for the class to apply visually
+          requestAnimationFrame(() => card.classList.add('dragging'));
+        });
+
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          document.querySelectorAll('.table-card').forEach(c => c.classList.remove('drag-over'));
+          draggedId = null;
+        });
+
+        card.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (card.dataset.tableId !== draggedId) {
+            card.classList.add('drag-over');
+          }
+        });
+
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('drag-over');
+        });
+
+        card.addEventListener('drop', (e) => {
+          e.preventDefault();
+          card.classList.remove('drag-over');
+          const targetId = card.dataset.tableId;
+          if (!draggedId || draggedId === targetId) return;
+
+          // Compute new order
+          const ids = currentTables.map(t => t.id);
+          const fromIdx = ids.indexOf(draggedId);
+          const toIdx = ids.indexOf(targetId);
+          if (fromIdx === -1 || toIdx === -1) return;
+
+          ids.splice(fromIdx, 1);
+          ids.splice(toIdx, 0, draggedId);
+
+          socket.emit('reorderTables', ids);
+        });
+      });
+    }
+
+    // ── Touch drag support for tablets ─────────────────────────────
+    let touchDragEl = null;
+    let touchStartY = 0;
+    let touchStartX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      const card = e.target.closest('.table-card');
+      if (!card) return;
+      touchDragEl = card;
+      draggedId = card.dataset.tableId;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!touchDragEl) return;
+      const dx = Math.abs(e.touches[0].clientX - touchStartX);
+      const dy = Math.abs(e.touches[0].clientY - touchStartY);
+      if (dx > 10 || dy > 10) {
+        touchDragEl.classList.add('dragging');
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      if (!touchDragEl || !draggedId) { touchDragEl = null; return; }
+      touchDragEl.classList.remove('dragging');
+
+      const touch = e.changedTouches[0];
+      const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetCard = dropTarget ? dropTarget.closest('.table-card') : null;
+
+      if (targetCard && targetCard.dataset.tableId !== draggedId) {
+        const ids = currentTables.map(t => t.id);
+        const fromIdx = ids.indexOf(draggedId);
+        const toIdx = ids.indexOf(targetCard.dataset.tableId);
+        if (fromIdx !== -1 && toIdx !== -1) {
+          ids.splice(fromIdx, 1);
+          ids.splice(toIdx, 0, draggedId);
+          socket.emit('reorderTables', ids);
+        }
+      }
+
+      touchDragEl = null;
+      draggedId = null;
+      document.querySelectorAll('.table-card').forEach(c => c.classList.remove('drag-over'));
     });
   </script>
 </body>

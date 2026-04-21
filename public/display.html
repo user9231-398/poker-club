@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Club - Display</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow-x: hidden; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span class="suits">&spades;&hearts;&clubs;&diams;</span> <span id="sessionName">Poker Night</span></h1>
+    <div>
+      <span class="live-dot"></span>
+      <span class="badge">Live</span>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="display-grid">
+      <!-- Tables -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            Tables
+            <span id="tableCount" style="color:var(--text-dim);font-weight:500;font-size:0.8rem;"></span>
+          </div>
+          <div class="panel-body">
+            <div id="tablesArea" class="tables-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            Leaderboard
+            <span id="playerCount" style="color:var(--text-dim);font-weight:500;font-size:0.8rem;"></span>
+          </div>
+          <div class="panel-body" style="padding:0.5rem 0;">
+            <div id="leaderboard"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Seat positions (percentages) for different table sizes
+    function seatPositions(count) {
+      // Return positions as [top%, left%] around the oval
+      const positions = [];
+      for (let i = 0; i < count; i++) {
+        const angle = (2 * Math.PI * i / count) - Math.PI / 2;
+        const rx = 58; // x radius %
+        const ry = 58; // y radius %
+        const cx = 50;
+        const cy = 50;
+        positions.push([
+          cy + ry * Math.sin(angle),
+          cx + rx * Math.cos(angle)
+        ]);
+      }
+      return positions;
+    }
+
+    function renderTable(table) {
+      const positions = seatPositions(table.seats.length);
+      const seatsHTML = table.seats.map((seat, i) => {
+        const [top, left] = positions[i];
+        const occupied = seat.playerName ? 'occupied' : '';
+        const eliminated = seat.eliminated ? 'eliminated' : '';
+        const initials = seat.playerName
+          ? seat.playerName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+          : seat.position;
+        return `
+          <div class="seat ${occupied} ${eliminated}" style="top:${top}%;left:${left}%;">
+            <div class="seat-circle">${initials}</div>
+            <div class="seat-name">${seat.playerName || 'Empty'}</div>
+            ${seat.playerName ? `<div class="seat-score">${seat.score || 0}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="table-visual animate-in">
+          <div class="table-label"><span>${table.name}</span>${table.dealerName ? ' &mdash; ' + table.dealerName : ''}</div>
+          <div class="felt">
+            <div class="dealer-tag">DEALER${table.dealerName ? '<span class="name">' + table.dealerName + '</span>' : ''}</div>
+            ${seatsHTML}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderLeaderboard(players) {
+      if (!players.length) {
+        return '<div class="empty-state"><div class="icon">&spades;</div><p>No players yet</p></div>';
+      }
+
+      return players.map((p, i) => {
+        const rank = i + 1;
+        let rankClass = '';
+        if (rank === 1) rankClass = 'gold';
+        else if (rank === 2) rankClass = 'silver';
+        else if (rank === 3) rankClass = 'bronze';
+
+        return `
+          <div class="leaderboard-row ${p.eliminated ? 'eliminated' : ''} animate-in" style="animation-delay:${i * 0.03}s">
+            <div class="rank ${rankClass}">${rank}</div>
+            <div class="player-name">${p.name}</div>
+            <div class="player-score">${p.totalScore}</div>
+            <div class="player-knockouts">${p.knockouts ? p.knockouts + ' KO' : ''}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    socket.on('state', (data) => {
+      document.getElementById('sessionName').textContent = data.sessionName;
+      document.title = data.sessionName + ' - Display';
+
+      // Tables
+      const tablesArea = document.getElementById('tablesArea');
+      if (data.tables.length === 0) {
+        tablesArea.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables set up yet.<br>Use the Admin panel to add tables.</p></div>';
+      } else {
+        tablesArea.innerHTML = data.tables.map(renderTable).join('');
+      }
+      document.getElementById('tableCount').textContent = data.tables.length + ' table' + (data.tables.length !== 1 ? 's' : '');
+
+      // Leaderboard
+      document.getElementById('leaderboard').innerHTML = renderLeaderboard(data.leaderboard);
+      document.getElementById('playerCount').textContent = data.leaderboard.length + ' player' + (data.leaderboard.length !== 1 ? 's' : '');
+    });
+  </script>
+</body>
+</html>

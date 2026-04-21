@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Poker Club - Dealer</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background: var(--bg); }
+  </style>
+</head>
+<body>
+  <!-- PIN Screen -->
+  <div id="pinScreen" class="pin-screen">
+    <h2><span style="color:var(--gold);">&spades;&hearts;&clubs;&diams;</span><br>Dealer Login</h2>
+    <input type="password" id="pinInput" class="pin-input" maxlength="6" placeholder="PIN" inputmode="numeric" autocomplete="off">
+    <div id="pinError" class="pin-error"></div>
+    <button class="btn btn-gold btn-lg" onclick="authenticate()">Enter</button>
+  </div>
+
+  <!-- Main Dealer Interface -->
+  <div id="dealerMain" style="display:none;">
+    <div class="header">
+      <h1><span class="suits">&spades;&hearts;</span> Dealer</h1>
+      <span id="dealerSessionName" style="color:var(--text-dim);font-size:0.85rem;"></span>
+    </div>
+
+    <div class="dealer-container">
+      <!-- Table selector tabs -->
+      <div id="tableTabs" class="tab-bar"></div>
+
+      <!-- Quick Add Player -->
+      <div id="quickAdd" class="player-card" style="display:none;border-color:var(--gold);background:var(--surface2);">
+        <div style="font-weight:700;font-size:0.85rem;margin-bottom:0.5rem;color:var(--gold);">+ Add Player</div>
+        <div style="display:flex;gap:0.5rem;">
+          <input type="text" id="quickAddInput" placeholder="Player name..." style="flex:1;"
+            onkeydown="if(event.key==='Enter')quickAddPlayer()">
+          <button class="btn btn-gold btn-sm" onclick="quickAddPlayer()">Add</button>
+        </div>
+        <div id="quickAddInfo" style="font-size:0.7rem;color:var(--text-dim);margin-top:0.4rem;"></div>
+      </div>
+
+      <!-- Seats for selected table -->
+      <div id="seatsList"></div>
+    </div>
+  </div>
+
+  <!-- Score Edit Modal -->
+  <div id="scoreModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeModal()">
+    <div class="modal">
+      <h3>Set Score</h3>
+      <div class="form-group">
+        <label>Player: <span id="modalPlayerName"></span></label>
+      </div>
+      <div class="form-group">
+        <label>Score</label>
+        <input type="number" id="modalScoreInput" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label>Knockouts</label>
+        <input type="number" id="modalKoInput" inputmode="numeric" min="0">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-gold" onclick="saveModal()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let tables = [];
+    let selectedTableId = null;
+    let modalContext = null;
+
+    // ── Auth ───────────────────────────────────────────────────────
+    function authenticate() {
+      const pin = document.getElementById('pinInput').value;
+      socket.emit('dealerAuth', pin, (res) => {
+        if (res.success) {
+          document.getElementById('pinScreen').style.display = 'none';
+          document.getElementById('dealerMain').style.display = 'block';
+        } else {
+          document.getElementById('pinError').textContent = 'Wrong PIN';
+          document.getElementById('pinInput').value = '';
+          document.getElementById('pinInput').focus();
+        }
+      });
+    }
+
+    document.getElementById('pinInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') authenticate();
+    });
+
+    // ── State handling ─────────────────────────────────────────────
+    socket.on('state', (data) => {
+      tables = data.tables;
+      document.getElementById('dealerSessionName').textContent = data.sessionName;
+
+      // If no table selected or selected table was removed, pick first
+      if (!selectedTableId || !tables.find(t => t.id === selectedTableId)) {
+        selectedTableId = tables.length ? tables[0].id : null;
+      }
+
+      renderTabs();
+      renderSeats();
+      updateQuickAdd();
+    });
+
+    function renderTabs() {
+      const container = document.getElementById('tableTabs');
+      if (tables.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      container.innerHTML = tables.map(t => `
+        <button class="${t.id === selectedTableId ? 'active' : ''}" onclick="selectTable('${t.id}')">
+          ${t.name}
+        </button>
+      `).join('');
+    }
+
+    function selectTable(id) {
+      selectedTableId = id;
+      renderTabs();
+      renderSeats();
+      updateQuickAdd();
+    }
+
+    function renderSeats() {
+      const container = document.getElementById('seatsList');
+      const table = tables.find(t => t.id === selectedTableId);
+
+      if (!table) {
+        container.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables yet.<br>Ask the admin to set up tables.</p></div>';
+        return;
+      }
+
+      container.innerHTML = table.seats.map(seat => {
+        const hasPlayer = !!seat.playerName;
+        const eliminated = seat.eliminated;
+
+        if (!hasPlayer) {
+          // Empty seat - show input to add player
+          return `
+            <div class="player-card animate-in">
+              <div class="player-card-header">
+                <div class="seat-num">${seat.position}</div>
+                <input class="name-input" type="text" placeholder="Enter player name..."
+                  id="nameInput_${seat.position}"
+                  onkeydown="if(event.key==='Enter')seatPlayer(${seat.position}, this.value)">
+                <button class="btn btn-primary btn-sm" onclick="seatPlayer(${seat.position}, document.getElementById('nameInput_${seat.position}').value)">
+                  Seat
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="player-card ${eliminated ? 'eliminated-card' : ''} animate-in">
+            <div class="player-card-header">
+              <div class="seat-num" style="${eliminated ? 'background:var(--red);' : ''}">${seat.position}</div>
+              <div style="flex:1;margin:0 0.6rem;">
+                <div style="font-weight:700;font-size:0.95rem;${eliminated ? 'text-decoration:line-through;opacity:0.5;' : ''}">${seat.playerName}</div>
+                <div style="font-size:0.7rem;color:var(--text-dim);">${seat.knockouts ? seat.knockouts + ' knockouts' : ''}</div>
+              </div>
+              <div class="score-controls">
+                <button class="score-btn" onclick="addScore('${seat.position}', -10)">&minus;</button>
+                <div class="score-value">${seat.score || 0}</div>
+                <button class="score-btn" onclick="addScore('${seat.position}', 10)">+</button>
+              </div>
+            </div>
+            <div class="player-card-actions">
+              <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openScoreModal(${seat.position}, '${seat.playerName.replace(/'/g, "\\'")}', ${seat.score || 0}, ${seat.knockouts || 0})">
+                Edit
+              </button>
+              <button class="btn ${eliminated ? 'btn-primary' : 'btn-danger'} btn-sm" style="flex:1;" onclick="toggleEliminate(${seat.position})">
+                ${eliminated ? 'Restore' : 'Eliminate'}
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="unseatPlayer(${seat.position})" title="Remove player">
+                &times;
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ── Quick Add ──────────────────────────────────────────────────
+    function quickAddPlayer() {
+      const input = document.getElementById('quickAddInput');
+      const name = input.value.trim();
+      if (!name) return;
+
+      const table = tables.find(t => t.id === selectedTableId);
+      if (!table) return;
+
+      const emptySeat = table.seats.find(s => !s.playerName);
+      if (!emptySeat) {
+        document.getElementById('quickAddInfo').textContent = 'All seats are full!';
+        return;
+      }
+
+      socket.emit('seatPlayer', { tableId: selectedTableId, position: emptySeat.position, playerName: name });
+      input.value = '';
+      input.focus();
+    }
+
+    function updateQuickAdd() {
+      const quickAdd = document.getElementById('quickAdd');
+      const table = tables.find(t => t.id === selectedTableId);
+      if (!table) {
+        quickAdd.style.display = 'none';
+        return;
+      }
+      quickAdd.style.display = 'block';
+      const emptyCount = table.seats.filter(s => !s.playerName).length;
+      const info = document.getElementById('quickAddInfo');
+      if (emptyCount === 0) {
+        info.textContent = 'Table full (' + table.seats.length + '/' + table.seats.length + ')';
+      } else {
+        info.textContent = emptyCount + ' seat' + (emptyCount !== 1 ? 's' : '') + ' available - next: Seat ' +
+          table.seats.find(s => !s.playerName).position;
+      }
+    }
+
+    // ── Actions ────────────────────────────────────────────────────
+    function seatPlayer(position, name) {
+      if (!name || !name.trim()) return;
+      socket.emit('seatPlayer', { tableId: selectedTableId, position, playerName: name.trim() });
+    }
+
+    function unseatPlayer(position) {
+      if (confirm('Remove this player from the seat?')) {
+        socket.emit('unseatPlayer', { tableId: selectedTableId, position });
+      }
+    }
+
+    function addScore(position, amount) {
+      socket.emit('addScore', { tableId: selectedTableId, position: Number(position), amount });
+    }
+
+    function toggleEliminate(position) {
+      socket.emit('eliminatePlayer', { tableId: selectedTableId, position });
+    }
+
+    // ── Score modal ────────────────────────────────────────────────
+    function openScoreModal(position, playerName, score, knockouts) {
+      modalContext = { position };
+      document.getElementById('modalPlayerName').textContent = playerName;
+      document.getElementById('modalScoreInput').value = score;
+      document.getElementById('modalKoInput').value = knockouts;
+      document.getElementById('scoreModal').style.display = 'flex';
+      document.getElementById('modalScoreInput').focus();
+    }
+
+    function closeModal() {
+      document.getElementById('scoreModal').style.display = 'none';
+      modalContext = null;
+    }
+
+    function saveModal() {
+      if (!modalContext) return;
+      const score = Number(document.getElementById('modalScoreInput').value) || 0;
+      const knockouts = Number(document.getElementById('modalKoInput').value) || 0;
+      socket.emit('updateScore', { tableId: selectedTableId, position: modalContext.position, score });
+      socket.emit('updateKnockouts', { tableId: selectedTableId, position: modalContext.position, knockouts });
+      closeModal();
+    }
+  </script>
+</body>
+</html>

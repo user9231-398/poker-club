@@ -1,0 +1,678 @@
+/* ── Poker Club Global Styles ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --bg: #0a0e17;
+  --surface: #131a2b;
+  --surface2: #1a2340;
+  --border: #243052;
+  --gold: #f0b430;
+  --gold-dim: #c4922a;
+  --green: #2ecc71;
+  --red: #e74c3c;
+  --text: #e8ecf4;
+  --text-dim: #7b8db5;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59, 130, 246, 0.25);
+  --felt: #1a5c2a;
+  --felt-border: #2d8a47;
+  --eliminated: #4a1a1a;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.header .suits {
+  color: var(--gold);
+  margin-right: 0.5rem;
+}
+
+.header .badge {
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.header .live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--green);
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.4rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.6); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(46, 204, 113, 0); }
+}
+
+/* ── Layout ─────────────────────────────────────────────────────── */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.display-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .display-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Cards / Panels ─────────────────────────────────────────────── */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.panel-body {
+  padding: 1rem 1.25rem;
+}
+
+/* ── Leaderboard ────────────────────────────────────────────────── */
+.leaderboard-row {
+  display: grid;
+  grid-template-columns: 40px 1fr 90px 80px;
+  align-items: center;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.leaderboard-row:last-child { border-bottom: none; }
+.leaderboard-row:hover { background: rgba(255,255,255,0.02); }
+
+.leaderboard-row.eliminated {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.rank {
+  font-weight: 800;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.rank.gold { color: #ffd700; }
+.rank.silver { color: #c0c0c0; }
+.rank.bronze { color: #cd7f32; }
+
+.player-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.player-score {
+  font-weight: 800;
+  font-size: 1.05rem;
+  text-align: right;
+  color: var(--gold);
+}
+
+.player-knockouts {
+  font-size: 0.8rem;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+/* ── Poker Table Visual ─────────────────────────────────────────── */
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.table-visual {
+  position: relative;
+  padding: 1rem;
+}
+
+.table-label {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-dim);
+}
+
+.table-label span {
+  color: var(--text);
+}
+
+.felt {
+  position: relative;
+  width: 280px;
+  height: 180px;
+  margin: 2.5rem auto;
+  background: radial-gradient(ellipse, #1f7a3a 0%, #145a28 60%, #0f4a1f 100%);
+  border-radius: 90px;
+  border: 4px solid var(--felt-border);
+  box-shadow: 0 0 30px rgba(30, 120, 55, 0.2), inset 0 0 40px rgba(0,0,0,0.3);
+}
+
+.felt .dealer-tag {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.felt .dealer-tag .name {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.5);
+}
+
+/* Seat positions around the oval */
+.seat {
+  position: absolute;
+  width: 56px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.seat-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 3px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  transition: all 0.3s;
+}
+
+.seat.occupied .seat-circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.seat.eliminated .seat-circle {
+  background: var(--red);
+  border-color: #c0392b;
+  opacity: 0.5;
+}
+
+.seat-name {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 56px;
+}
+
+.seat-score {
+  font-size: 0.55rem;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* Seat positions for 8-seat table */
+.seat[data-pos="1"] { top: -16px; left: 30%; }
+.seat[data-pos="2"] { top: -16px; left: 70%; }
+.seat[data-pos="3"] { top: 30%; left: 108%; }
+.seat[data-pos="4"] { top: 70%; left: 108%; }
+.seat[data-pos="5"] { top: 116%; left: 70%; }
+.seat[data-pos="6"] { top: 116%; left: 30%; }
+.seat[data-pos="7"] { top: 70%; left: -8%; }
+.seat[data-pos="8"] { top: 30%; left: -8%; }
+
+/* Extra positions for 9-10 seat tables */
+.seat[data-pos="9"] { top: -16px; left: 50%; }
+.seat[data-pos="10"] { top: 116%; left: 50%; }
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+.btn-primary:hover { background: #2563eb; }
+
+.btn-gold {
+  background: var(--gold);
+  color: var(--bg);
+}
+.btn-gold:hover { background: var(--gold-dim); }
+
+.btn-danger {
+  background: var(--red);
+  color: white;
+}
+.btn-danger:hover { background: #c0392b; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+.btn-lg { padding: 0.8rem 1.6rem; font-size: 1rem; }
+
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Forms ──────────────────────────────────────────────────────── */
+input, select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+
+.form-group { margin-bottom: 1rem; }
+
+.form-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.form-row > * { flex: 1; }
+
+/* ── Dealer Mobile ──────────────────────────────────────────────── */
+.dealer-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.player-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s;
+}
+
+.player-card.eliminated-card {
+  background: var(--eliminated);
+  border-color: #6b2a2a;
+}
+
+.player-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.player-card-header .seat-num {
+  background: var(--accent);
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.player-card-header .name-input {
+  flex: 1;
+  margin: 0 0.6rem;
+  font-weight: 600;
+}
+
+.score-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.score-controls .score-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--gold);
+  min-width: 60px;
+  text-align: center;
+}
+
+.score-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.score-btn:active {
+  transform: scale(0.92);
+  background: var(--accent);
+}
+
+.player-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* ── Admin ──────────────────────────────────────────────────────── */
+.admin-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.table-admin-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.table-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* ── Landing page ───────────────────────────────────────────────── */
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+  padding: 2rem;
+}
+
+.landing h1 {
+  font-size: 3rem;
+  font-weight: 900;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.03em;
+}
+
+.landing .suits-big {
+  font-size: 2rem;
+  color: var(--gold);
+  margin-bottom: 2rem;
+}
+
+.landing-cards {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.landing-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 170px;
+  text-decoration: none;
+  color: var(--text);
+  transition: all 0.25s;
+  cursor: pointer;
+}
+
+.landing-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15);
+}
+
+.landing-card .icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.landing-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.landing-card p {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── PIN screen ─────────────────────────────────────────────────── */
+.pin-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.pin-screen h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+}
+
+.pin-input {
+  font-size: 2rem;
+  text-align: center;
+  letter-spacing: 0.5em;
+  max-width: 200px;
+  margin-bottom: 1rem;
+}
+
+.pin-error {
+  color: var(--red);
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+  min-height: 1.2em;
+}
+
+/* ── No data ────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dim);
+}
+
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+.empty-state p { font-size: 0.9rem; }
+
+/* ── Tab selector for dealer ────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.tab-bar button {
+  flex: 1;
+  padding: 0.7rem;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-bar button.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* ── Quick score input modal ────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 360px;
+  animation: slideIn 0.2s ease-out;
+}
+
+.modal h3 {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.modal-actions .btn { flex: 1; }
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .header { padding: 0.75rem 1rem; }
+  .header h1 { font-size: 1.1rem; }
+  .container { padding: 0.75rem; }
+  .felt { width: 220px; height: 140px; }
+  .seat-circle { width: 32px; height: 32px; font-size: 0.65rem; }
+  .seat-name { font-size: 0.55rem; max-width: 44px; }
+}

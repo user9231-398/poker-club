@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Club - Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="header">
+    <h1><span class="suits">&spades;&hearts;&clubs;&diams;</span> Admin</h1>
+    <a href="/" class="btn btn-ghost btn-sm">Home</a>
+  </div>
+
+  <div class="admin-container">
+    <!-- Session Settings -->
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <div class="panel-header">Session Settings</div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Session Name</label>
+            <input type="text" id="sessionName" placeholder="Poker Night">
+          </div>
+          <div class="form-group">
+            <label>Dealer PIN</label>
+            <input type="text" id="dealerPin" placeholder="1234" maxlength="6">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Add Table -->
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <div class="panel-header">Add New Table</div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Table Name</label>
+            <input type="text" id="newTableName" placeholder="Table 1">
+          </div>
+          <div class="form-group">
+            <label>Seats</label>
+            <select id="newTableSeats">
+              <option value="4">4 seats</option>
+              <option value="6">6 seats</option>
+              <option value="8" selected>8 seats</option>
+              <option value="9">9 seats</option>
+              <option value="10">10 seats</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Dealer Name (optional)</label>
+          <input type="text" id="newDealerName" placeholder="Dealer name">
+        </div>
+        <button class="btn btn-gold" onclick="addTable()">Add Table</button>
+      </div>
+    </div>
+
+    <!-- Existing Tables -->
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <div class="panel-header">
+        Current Tables
+        <span id="tableCount" style="color:var(--text-dim);font-weight:500;font-size:0.8rem;"></span>
+      </div>
+      <div class="panel-body">
+        <div id="tablesList"></div>
+      </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <div class="panel-header">Quick Links</div>
+      <div class="panel-body">
+        <p style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.75rem;">
+          Share these links with your dealers and display screen. Everyone must be on the same Wi-Fi network.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="background:var(--bg);padding:0.6rem 0.8rem;border-radius:8px;font-family:monospace;font-size:0.8rem;" id="displayLink"></div>
+          <div style="background:var(--bg);padding:0.6rem 0.8rem;border-radius:8px;font-family:monospace;font-size:0.8rem;" id="dealerLink"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="panel" style="border-color:var(--red);">
+      <div class="panel-header" style="color:var(--red);">Danger Zone</div>
+      <div class="panel-body">
+        <button class="btn btn-danger" onclick="resetAll()">Reset Everything</button>
+        <p style="font-size:0.75rem;color:var(--text-dim);margin-top:0.5rem;">
+          This removes all tables and players. Cannot be undone.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let tables = [];
+
+    // Show links
+    const base = window.location.origin;
+    document.getElementById('displayLink').textContent = 'Display: ' + base + '/display.html';
+    document.getElementById('dealerLink').textContent = 'Dealer:  ' + base + '/dealer.html';
+
+    socket.on('state', (data) => {
+      tables = data.tables;
+      document.getElementById('sessionName').placeholder = data.sessionName;
+      renderTables();
+    });
+
+    function saveSettings() {
+      const name = document.getElementById('sessionName').value;
+      const pin = document.getElementById('dealerPin').value;
+      if (name) socket.emit('setSessionName', name);
+      if (pin) socket.emit('setDealerPin', pin);
+      // Visual feedback
+      const btn = event.target;
+      btn.textContent = 'Saved!';
+      setTimeout(() => btn.textContent = 'Save Settings', 1500);
+    }
+
+    function addTable() {
+      const name = document.getElementById('newTableName').value;
+      const seatCount = Number(document.getElementById('newTableSeats').value);
+      const dealerName = document.getElementById('newDealerName').value;
+      socket.emit('addTable', { name, seatCount, dealerName });
+      document.getElementById('newTableName').value = '';
+      document.getElementById('newDealerName').value = '';
+    }
+
+    function removeTable(id) {
+      if (confirm('Remove this table? All player data on it will be lost.')) {
+        socket.emit('removeTable', id);
+      }
+    }
+
+    function updateTable(id, field, value) {
+      const update = { tableId: id };
+      update[field] = value;
+      socket.emit('updateTable', update);
+    }
+
+    function resetAll() {
+      if (confirm('This will delete ALL tables and players. Are you sure?')) {
+        if (confirm('Really sure? This cannot be undone.')) {
+          socket.emit('resetAll');
+        }
+      }
+    }
+
+    function renderTables() {
+      const container = document.getElementById('tablesList');
+      document.getElementById('tableCount').textContent = tables.length + ' table' + (tables.length !== 1 ? 's' : '');
+
+      if (tables.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No tables yet. Add one above.</p></div>';
+        return;
+      }
+
+      container.innerHTML = tables.map(t => {
+        const playerCount = t.seats.filter(s => s.playerName).length;
+        return `
+          <div class="table-admin-card animate-in">
+            <div class="table-admin-header">
+              <div>
+                <strong>${t.name}</strong>
+                <span style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">
+                  ${playerCount}/${t.seats.length} seats
+                </span>
+                ${t.dealerName ? '<span style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">Dealer: ' + t.dealerName + '</span>' : ''}
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="removeTable('${t.id}')">Remove</button>
+            </div>
+            <div class="form-row" style="margin-top:0.6rem;">
+              <div class="form-group" style="margin-bottom:0;">
+                <input type="text" value="${t.name}" placeholder="Table name"
+                  onchange="updateTable('${t.id}', 'name', this.value)">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <input type="text" value="${t.dealerName || ''}" placeholder="Dealer name"
+                  onchange="updateTable('${t.id}', 'dealerName', this.value)">
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

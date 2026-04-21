@@ -7,6 +7,19 @@
   <link rel="stylesheet" href="style.css">
   <style>
     body { background: var(--bg); }
+    .settings-toggle {
+      background: none; border: none; color: var(--text-dim); font-size: 1.3rem;
+      cursor: pointer; padding: 0.3rem; transition: color 0.2s;
+    }
+    .settings-toggle:hover, .settings-toggle.open { color: var(--gold); }
+    .admin-section {
+      max-height: 0; overflow: hidden; transition: max-height 0.35s ease;
+    }
+    .admin-section.open { max-height: 1200px; }
+    .admin-section .panel { margin-bottom: 1rem; }
+    .divider {
+      border: none; border-top: 1px solid var(--border); margin: 1rem 0;
+    }
   </style>
 </head>
 <body>
@@ -18,14 +31,103 @@
     <button class="btn btn-gold btn-lg" onclick="authenticate()">Enter</button>
   </div>
 
-  <!-- Main Dealer Interface -->
+  <!-- Main Interface -->
   <div id="dealerMain" style="display:none;">
     <div class="header">
-      <h1><span class="suits">&spades;&hearts;</span> Dealer</h1>
-      <span id="dealerSessionName" style="color:var(--text-dim);font-size:0.85rem;"></span>
+      <h1><span class="suits">&spades;&hearts;</span> <span id="dealerSessionName">Dealer</span></h1>
+      <button class="settings-toggle" id="settingsBtn" onclick="toggleSettings()" title="Settings">&#9881;</button>
     </div>
 
     <div class="dealer-container">
+
+      <!-- ── Admin / Settings Section (collapsible) ──────────────── -->
+      <div id="adminSection" class="admin-section">
+
+        <!-- Session Settings -->
+        <div class="panel">
+          <div class="panel-header">Session Settings</div>
+          <div class="panel-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Session Name</label>
+                <input type="text" id="sessionNameInput" placeholder="Poker Night">
+              </div>
+              <div class="form-group">
+                <label>Dealer PIN</label>
+                <input type="text" id="dealerPinInput" placeholder="1234" maxlength="6">
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveSettings(this)">Save Settings</button>
+          </div>
+        </div>
+
+        <!-- Add Table -->
+        <div class="panel">
+          <div class="panel-header">Add New Table</div>
+          <div class="panel-body">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Table Name</label>
+                <input type="text" id="newTableName" placeholder="Table 1">
+              </div>
+              <div class="form-group">
+                <label>Seats</label>
+                <select id="newTableSeats">
+                  <option value="4">4 seats</option>
+                  <option value="6">6 seats</option>
+                  <option value="8" selected>8 seats</option>
+                  <option value="9">9 seats</option>
+                  <option value="10">10 seats</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Dealer Name (optional)</label>
+              <input type="text" id="newDealerName" placeholder="Dealer name">
+            </div>
+            <button class="btn btn-gold btn-sm" onclick="addTable()">Add Table</button>
+          </div>
+        </div>
+
+        <!-- Manage Tables -->
+        <div class="panel">
+          <div class="panel-header">
+            Manage Tables
+            <span id="adminTableCount" style="color:var(--text-dim);font-weight:500;font-size:0.8rem;"></span>
+          </div>
+          <div class="panel-body">
+            <div id="adminTablesList"></div>
+          </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="panel">
+          <div class="panel-header">Share Links</div>
+          <div class="panel-body">
+            <p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:0.5rem;">
+              Everyone must be on the same Wi-Fi network (or use the deployed URL).
+            </p>
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div style="background:var(--bg);padding:0.5rem 0.7rem;border-radius:8px;font-family:monospace;font-size:0.75rem;" id="displayLink"></div>
+              <div style="background:var(--bg);padding:0.5rem 0.7rem;border-radius:8px;font-family:monospace;font-size:0.75rem;" id="dealerLink"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="panel" style="border-color:var(--red);">
+          <div class="panel-header" style="color:var(--red);">Danger Zone</div>
+          <div class="panel-body">
+            <button class="btn btn-danger btn-sm" onclick="resetAll()">Reset Everything</button>
+            <p style="font-size:0.7rem;color:var(--text-dim);margin-top:0.4rem;">Removes all tables and players. Cannot be undone.</p>
+          </div>
+        </div>
+
+        <hr class="divider">
+      </div>
+
+      <!-- ── Dealer Controls ─────────────────────────────────────── -->
+
       <!-- Table selector tabs -->
       <div id="tableTabs" class="tab-bar"></div>
 
@@ -74,6 +176,11 @@
     let selectedTableId = null;
     let modalContext = null;
 
+    // Show share links
+    const base = window.location.origin;
+    document.getElementById('displayLink').textContent = 'Display: ' + base + '/display.html';
+    document.getElementById('dealerLink').textContent = 'Dealer:  ' + base + '/dealer.html';
+
     // ── Auth ───────────────────────────────────────────────────────
     function authenticate() {
       const pin = document.getElementById('pinInput').value;
@@ -93,12 +200,96 @@
       if (e.key === 'Enter') authenticate();
     });
 
+    // ── Settings toggle ────────────────────────────────────────────
+    function toggleSettings() {
+      const section = document.getElementById('adminSection');
+      const btn = document.getElementById('settingsBtn');
+      section.classList.toggle('open');
+      btn.classList.toggle('open');
+    }
+
+    // ── Admin actions ──────────────────────────────────────────────
+    function saveSettings(btn) {
+      const name = document.getElementById('sessionNameInput').value;
+      const pin = document.getElementById('dealerPinInput').value;
+      if (name) socket.emit('setSessionName', name);
+      if (pin) socket.emit('setDealerPin', pin);
+      btn.textContent = 'Saved!';
+      setTimeout(() => btn.textContent = 'Save Settings', 1500);
+    }
+
+    function addTable() {
+      const name = document.getElementById('newTableName').value;
+      const seatCount = Number(document.getElementById('newTableSeats').value);
+      const dealerName = document.getElementById('newDealerName').value;
+      socket.emit('addTable', { name, seatCount, dealerName });
+      document.getElementById('newTableName').value = '';
+      document.getElementById('newDealerName').value = '';
+    }
+
+    function removeTable(id) {
+      if (confirm('Remove this table? All player data on it will be lost.')) {
+        socket.emit('removeTable', id);
+      }
+    }
+
+    function updateTable(id, field, value) {
+      const update = { tableId: id };
+      update[field] = value;
+      socket.emit('updateTable', update);
+    }
+
+    function resetAll() {
+      if (confirm('This will delete ALL tables and players. Are you sure?')) {
+        if (confirm('Really sure? This cannot be undone.')) {
+          socket.emit('resetAll');
+        }
+      }
+    }
+
+    function renderAdminTables() {
+      const container = document.getElementById('adminTablesList');
+      document.getElementById('adminTableCount').textContent = tables.length + ' table' + (tables.length !== 1 ? 's' : '');
+
+      if (tables.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:1rem;"><p>No tables yet. Add one above.</p></div>';
+        return;
+      }
+
+      container.innerHTML = tables.map(t => {
+        const playerCount = t.seats.filter(s => s.playerName).length;
+        return `
+          <div class="table-admin-card animate-in">
+            <div class="table-admin-header">
+              <div>
+                <strong>${t.name}</strong>
+                <span style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">
+                  ${playerCount}/${t.seats.length} seats
+                </span>
+              </div>
+              <button class="btn btn-danger btn-sm" onclick="removeTable('${t.id}')">Remove</button>
+            </div>
+            <div class="form-row" style="margin-top:0.5rem;">
+              <div class="form-group" style="margin-bottom:0;">
+                <input type="text" value="${t.name}" placeholder="Table name"
+                  onchange="updateTable('${t.id}', 'name', this.value)">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <input type="text" value="${t.dealerName || ''}" placeholder="Dealer name"
+                  onchange="updateTable('${t.id}', 'dealerName', this.value)">
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     // ── State handling ─────────────────────────────────────────────
     socket.on('state', (data) => {
       tables = data.tables;
       document.getElementById('dealerSessionName').textContent = data.sessionName;
+      document.getElementById('sessionNameInput').placeholder = data.sessionName;
 
-      // If no table selected or selected table was removed, pick first
       if (!selectedTableId || !tables.find(t => t.id === selectedTableId)) {
         selectedTableId = tables.length ? tables[0].id : null;
       }
@@ -106,6 +297,7 @@
       renderTabs();
       renderSeats();
       updateQuickAdd();
+      renderAdminTables();
     });
 
     function renderTabs() {
@@ -133,7 +325,7 @@
       const table = tables.find(t => t.id === selectedTableId);
 
       if (!table) {
-        container.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables yet.<br>Ask the admin to set up tables.</p></div>';
+        container.innerHTML = '<div class="empty-state"><div class="icon">&clubs;</div><p>No tables yet.<br>Tap the gear icon above to add tables.</p></div>';
         return;
       }
 
@@ -142,7 +334,6 @@
         const eliminated = seat.eliminated;
 
         if (!hasPlayer) {
-          // Empty seat - show input to add player
           return `
             <div class="player-card animate-in">
               <div class="player-card-header">
@@ -226,7 +417,7 @@
       }
     }
 
-    // ── Actions ────────────────────────────────────────────────────
+    // ── Dealer Actions ─────────────────────────────────────────────
     function seatPlayer(position, name) {
       if (!name || !name.trim()) return;
       socket.emit('seatPlayer', { tableId: selectedTableId, position, playerName: name.trim() });
